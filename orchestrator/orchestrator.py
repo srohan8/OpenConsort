@@ -144,23 +144,47 @@ Output ONLY these ---FILE:---/---END--- blocks (one or more). Keep the implement
 simple and correct - a single main file is fine for a small app. Implement the features
 listed in the LockedSpec, not just a placeholder/stub."""
 
+FRONTEND_SYSTEM = """You are the Frontend specialist in a fixed software-build pipeline.
+Given a LockedSpec, DesignTokens, and UserFlow, write the frontend code for this app,
+using the frontend stack specified in LockedSpec.stack.frontend (e.g. React + Vite).
 
-def build_stage_llms(use_ollama_for_backend: bool) -> dict:
+Respond using this EXACT delimited plain-text format - NOT JSON, no escaping of any kind.
+Write your code exactly as it should appear in each file, including real newlines and quotes:
+
+---FILE: <the real path you choose, e.g. src/App.jsx>---
+<the file's full content, written normally, no escaping>
+---END---
+
+You may include more than one file by repeating the block with a different real path
+(e.g. one component per screen in UserFlow, plus an entry point / router file).
+
+Concrete example (illustrative only - use your OWN real filename and implementation,
+do not copy this example's filename or content):
+---FILE: example_placeholder_component.jsx---
+export default function Example() {{
+  return <div>hi</div>;
+}}
+---END---
+
+Output ONLY these ---FILE:---/---END--- blocks (one or more). Build the actual screens
+and navigation described in UserFlow (one component per screen is a reasonable default
+for a small app) - implement the real flow, not a placeholder/stub, and apply the colors/
+typography/spacing from DesignTokens where relevant."""
+
+
+def build_stage_llms(use_ollama_for_backend: bool, use_ollama_for_frontend: bool) -> dict:
     cloud = dict(
         base_url=os.getenv("CLOUD_BASE_URL", "http://localhost:20128/v1"),
         api_key=os.getenv("OPENAI_API_KEY", ""),
         model=os.getenv("CLOUD_MODEL", "My-combo"),
     )
+    ollama = dict(base_url="http://localhost:11434/v1", api_key="ollama", model="qwen2.5-coder:1.5b")
     stages = {
         "planning": StageLLM("planning", **cloud),
         "design": StageLLM("design", **cloud),
     }
-    if use_ollama_for_backend:
-        stages["backend"] = StageLLM(
-            "backend", base_url="http://localhost:11434/v1", api_key="ollama", model="qwen2.5-coder:1.5b"
-        )
-    else:
-        stages["backend"] = StageLLM("backend", **cloud)
+    stages["backend"] = StageLLM("backend", **(ollama if use_ollama_for_backend else cloud))
+    stages["frontend"] = StageLLM("frontend", **(ollama if use_ollama_for_frontend else cloud))
     return stages
 
 
@@ -168,10 +192,12 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("idea", help="one-line product idea")
     parser.add_argument("--ollama-backend", action="store_true", help="route Backend stage to local Ollama")
+    parser.add_argument("--ollama-frontend", action="store_true", help="route Frontend stage to local Ollama")
     args = parser.parse_args()
 
-    run_id = datetime.datetime.now().strftime("%Y%m%d_%H%M%S") + ("_ollama" if args.ollama_backend else "_cloud")
-    stages = build_stage_llms(args.ollama_backend)
+    suffix = "_ollama" if (args.ollama_backend or args.ollama_frontend) else "_cloud"
+    run_id = datetime.datetime.now().strftime("%Y%m%d_%H%M%S") + suffix
+    stages = build_stage_llms(args.ollama_backend, args.ollama_frontend)
 
     locked_spec_schema = load_schema("locked_spec.schema.json")
     user_flow_schema = load_schema("user_flow.schema.json")
@@ -212,17 +238,27 @@ def main():
         spec_version=locked_spec["version"],
     )
 
-    print("\n=== Pipeline complete ===")
-    print(f"Backend produced {len(backend_out['files'])} file(s):")
-    for f in backend_out["files"]:
-        print(f"  - {f['path']} ({len(f['content'])} chars)")
+    frontend_out = run_code_stage(
+        run_id,
+        "frontend",
+        stages["frontend"],
+        FRONTEND_SYSTEM,
+        f"LockedSpec:\n{json.dumps(locked_spec)}\n\n"
+        f"DesignTokens:\n{json.dumps(design_out)}\n\n"
+        f"UserFlow:\n{json.dumps(user_flow)}",
+        spec_version=locked_spec["version"],
+    )
 
+    print("\n=== Pipeline complete ===")
     out_dir = ROOT / "generated" / run_id
     out_dir.mkdir(parents=True, exist_ok=True)
-    for f in backend_out["files"]:
-        target = out_dir / f["path"]
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(f["content"], encoding="utf-8")
+    for stage_name, stage_out in (("backend", backend_out), ("frontend", frontend_out)):
+        print(f"{stage_name.capitalize()} produced {len(stage_out['files'])} file(s):")
+        for f in stage_out["files"]:
+            print(f"  - {f['path']} ({len(f['content'])} chars)")
+            target = out_dir / f["path"]
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(f["content"], encoding="utf-8")
     print(f"Files written to {out_dir}")
 
 

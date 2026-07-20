@@ -58,23 +58,29 @@ def extract_json(text: str) -> dict:
     return json.loads(candidate)
 
 
-FILE_BLOCK_RE = re.compile(
-    r"---\s*FILE:\s*(?P<path>[^\n\r-]+?)\s*---\r?\n(?P<content>.*?)\r?\n?---\s*END\s*---",
-    re.DOTALL,
-)
+FILE_START_RE = re.compile(r"---\s*FILE:\s*(?P<path>[^\n\r-]+?)\s*---\r?\n")
+FILE_END_RE = re.compile(r"\r?\n?---\s*END\s*---")
 
 
 def extract_files(text: str) -> list[dict]:
     """Parse '---FILE: path---\\n<raw code>\\n---END---' blocks out of free text.
     No JSON, no escaping required - a model writes code exactly as it normally would.
-    Anything outside FILE/END markers (prose, reasoning) is ignored."""
-    # models sometimes wrap the whole thing in a ```...``` fence - strip fences if present,
-    # markers still get found either way since we search the raw text directly.
+    Anything outside FILE/END markers (prose, reasoning) is ignored.
+
+    Tolerant of a missing ---END--- marker: small models sometimes emit every
+    ---FILE:--- opener correctly but drop the closer, especially across many
+    files in one response. When no ---END--- is found before the next ---FILE:---
+    (or end of text), that point is treated as the implicit end of the block."""
+    starts = list(FILE_START_RE.finditer(text))
     files = []
-    for m in FILE_BLOCK_RE.finditer(text):
-        path = m.group("path").strip()
-        content = m.group("content")
+    for i, start_match in enumerate(starts):
+        path = start_match.group("path").strip()
+        content_from = start_match.end()
+        content_to = starts[i + 1].start() if i + 1 < len(starts) else len(text)
+        chunk = text[content_from:content_to]
+        end_match = FILE_END_RE.search(chunk)
+        content = chunk[: end_match.start()] if end_match else chunk.rstrip()
         files.append({"path": path, "content": content})
     if not files:
-        raise ValueError(f"No ---FILE: ... --- / ---END--- blocks found in model output:\n{text[:500]}")
+        raise ValueError(f"No ---FILE: ... --- blocks found in model output:\n{text[:500]}")
     return files
