@@ -1,0 +1,36 @@
+# --- Secrets / env ---
+.env
+*.env
+!.env.example
+# MetaGPT stores real API keys here
+MetaGPT/config/config2.yaml
+**/config2.yaml
+**/vault.yaml
+**/key.yaml
+
+# --- Python ---
+.venv/
+**/.venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+
+# --- Logs / scratch (may contain leaked keys) ---
+*.log
+scratch_*.log
+orchestrator/logs/
+
+# --- Generated output ---
+orchestrator/generated/
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+
+# --- Local tool runtime state ---
+.claude/
+
+# --- MetaGPT is its own git repo (separate clone/track), not part of this
+# --- repo's history. Add via `git submodule add` deliberately if ever wanted.
+MetaGPT/

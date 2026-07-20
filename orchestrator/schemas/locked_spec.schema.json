@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "locked_spec.schema.json",
+  "title": "LockedSpec",
+  "description": "Output of the Planning/Requirements stage. Product type, stack, and feature scope, locked for this build cycle.",
+  "type": "object",
+  "required": ["version", "product_type", "stack", "features"],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Spec version. Incremented on every re-plan/delta cycle, never mutated in place."
+    },
+    "product_type": {
+      "type": "string",
+      "enum": ["web_app", "portfolio", "ecommerce", "blog", "internal_tool", "mobile_app"]
+    },
+    "stack": {
+      "type": "object",
+      "required": ["backend", "frontend", "database", "auth"],
+      "properties": {
+        "backend": { "type": "string" },
+        "frontend": { "type": "string" },
+        "database": { "type": "string" },
+        "auth": { "type": "string" },
+        "payments": { "type": ["string", "null"] }
+      }
+    },
+    "features": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "description": "Plain-language feature list, e.g. 'user signup/login', 'create/edit/delete tasks'."
+    },
+    "constraints": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Optional non-functional constraints (e.g. 'must run on 8GB RAM', 'no external API calls')."
+    }
+  }
+}

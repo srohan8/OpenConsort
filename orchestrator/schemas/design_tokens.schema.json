@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "design_tokens.schema.json",
+  "title": "DesignTokens",
+  "description": "Output of the Design stage. Consumed as a constraint by Backend/Frontend specialists.",
+  "type": "object",
+  "required": ["version", "spec_version", "colors", "typography", "spacing"],
+  "properties": {
+    "version": { "type": "integer", "minimum": 1 },
+    "spec_version": { "type": "integer" },
+    "colors": {
+      "type": "object",
+      "required": ["primary", "background", "text"],
+      "additionalProperties": { "type": "string" }
+    },
+    "typography": {
+      "type": "object",
+      "required": ["font_family", "scale"],
+      "properties": {
+        "font_family": { "type": "string" },
+        "scale": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    },
+    "spacing": {
+      "type": "object",
+      "description": "Named spacing units, e.g. {'sm': '8px', 'md': '16px'}",
+      "additionalProperties": { "type": "string" }
+    },
+    "components": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "variants"],
+        "properties": {
+          "name": { "type": "string" },
+          "variants": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+  }
+}
