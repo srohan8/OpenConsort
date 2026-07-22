@@ -7,7 +7,9 @@ const TABS = [
 export default function Sidebar({ activeTab, onSelectTab }) {
   return (
     <nav className="sidebar">
-      <div className="sidebar-title">OpenConsort</div>
+      <div className="sidebar-title">
+        <img src="/logo_text.png" alt="OpenConsort" className="sidebar-logo-text" />
+      </div>
       {TABS.map((tab) => (
         <button
           key={tab.id}
