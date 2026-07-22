@@ -16,6 +16,11 @@ __pycache__/
 *.pyc
 *.pyo
 
+# --- Node ---
+node_modules/
+**/node_modules/
+frontend/dist/
+
 # --- Logs / scratch (may contain leaked keys) ---
 *.log
 scratch_*.log

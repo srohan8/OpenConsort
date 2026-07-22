@@ -1,0 +1,628 @@
+/* --- General chrome palette: "Sunset Stripe" --- Applied to background,
+   text, borders, and the main accent only. Module identity colors (mockData.js
+   moduleColors) are a SEPARATE, purpose-built system and must never be
+   overwritten by these variables - they're the cross-tab tracking mechanism. */
+:root {
+  --chrome-muted: #6b7a6b; /* muted sage - secondary text / borders / low-emphasis elements */
+  --chrome-accent: #c4522e; /* terracotta - primary accent, selected nav/buttons/active states */
+  --chrome-warm: #e0a83e; /* mustard - secondary accent / hover states / secondary buttons */
+  --chrome-text-muted: #6b7a6b; /* muted sage - secondary text / borders */
+
+  --chrome-bg: #efe3cc; /* cream - page background / light surfaces */
+  --chrome-surface: #fbf5e8;
+  --chrome-border: color-mix(in srgb, var(--chrome-muted) 35%, white);
+  --chrome-text: #2a2823;
+
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--chrome-bg);
+  color: var(--chrome-text);
+}
+
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.appear {
+  animation: fade-slide-in 200ms ease-out;
+}
+
+@keyframes fade-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* --- Sidebar --- */
+.sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  background: #2e362e;
+  color: #ece9e3;
+  padding: 24px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sidebar-title {
+  padding: 0 20px 20px;
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: #fff;
+}
+
+.sidebar-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: none;
+  border: none;
+  color: inherit;
+  text-align: left;
+  padding: 10px 20px;
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  transition: background-color 180ms ease, border-color 180ms ease, transform 150ms ease;
+}
+
+.sidebar-tab-label {
+  font-size: 0.95rem;
+}
+
+.sidebar-tab-help {
+  font-size: 0.72rem;
+  line-height: 1.3;
+  color: #9c988f;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-tab:hover {
+  background: #3a443a;
+  transform: translateX(2px);
+}
+
+.sidebar-tab.active {
+  background: #3a443a;
+  border-left-color: var(--chrome-accent);
+  font-weight: 600;
+  color: #fff;
+}
+
+.sidebar-tab.active .sidebar-tab-help {
+  color: color-mix(in srgb, var(--chrome-accent) 70%, white);
+}
+
+/* --- Content area --- */
+.content-area {
+  flex: 1;
+  padding: 32px 40px;
+  max-width: 1100px;
+}
+
+/* --- Buttons --- */
+.btn-primary {
+  background: var(--chrome-accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 9px 16px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+}
+
+.btn-primary:hover {
+  background: var(--chrome-warm);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px color-mix(in srgb, var(--chrome-warm) 40%, transparent);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+/* --- Vintage card treatment (doc/kickoff-brief-vintage-cards.md) ---
+   Scoped to card-style module/screen representations only: Project Scope
+   module cards and the User Flow screen detail panel. NOT applied to
+   sidebar, buttons, inputs, or other non-card chrome. */
+:root {
+  --vintage-border: #2a241c;
+  --vintage-radius: 4px;
+  --stripe-terracotta: #c4522e;
+  --stripe-mustard: #e0a83e;
+  --stripe-sage: #6b7a6b;
+}
+
+.module-card,
+.detail-panel {
+  position: relative;
+  overflow: hidden;
+  border: 2px solid var(--vintage-border);
+  border-radius: var(--vintage-radius);
+  padding-top: 26px;
+}
+
+.module-card::before,
+.detail-panel::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 5px;
+  background: linear-gradient(
+    to right,
+    var(--stripe-terracotta) 0% 33.33%,
+    var(--stripe-mustard) 33.33% 66.66%,
+    var(--stripe-sage) 66.66% 100%
+  );
+}
+
+/* Module number badge (element #4) */
+.module-badge-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 4px;
+}
+
+.module-badge {
+  display: inline-block;
+  background: var(--stripe-terracotta);
+  color: #faf3e4;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 2px 8px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+.module-name-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--chrome-text-muted);
+}
+
+/* Serif plain-English title (element #3) */
+.module-heading .plain-title {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--chrome-text);
+}
+
+/* --- Project Scope tab: module cards --- */
+.module-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.module-card {
+  background: var(--chrome-surface);
+  padding-left: 20px;
+  padding-right: 20px;
+  padding-bottom: 18px;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.module-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+}
+
+.module-card.selected {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--module-color, var(--chrome-accent)) 35%, transparent);
+}
+
+/* Bolder, accent-colored done/total numbers (element #5) */
+.module-card-progress {
+  margin-top: 10px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--stripe-terracotta);
+  transition: color 200ms ease;
+}
+
+.module-card-features {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  font-size: 0.85rem;
+  color: var(--chrome-text-muted);
+}
+
+/* --- User Flow tab: canvas --- */
+.canvas-toolbar {
+  margin-bottom: 12px;
+}
+
+.flow-map-wrapper {
+  position: relative;
+  background: var(--chrome-surface);
+  border: 1px solid var(--chrome-border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.flow-screen-node {
+  width: 150px;
+  border-radius: 10px;
+  border: 2px solid var(--module-color, var(--chrome-accent));
+  background: #fff;
+  padding: 10px 12px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  text-align: center;
+  transition: box-shadow 150ms ease, opacity 200ms ease, transform 150ms ease;
+}
+
+.flow-screen-node:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transform: scale(1.02);
+}
+
+.flow-screen-node.selected {
+  background: var(--module-color, var(--chrome-accent));
+  color: #fff;
+}
+
+.flow-screen-node.dimmed {
+  opacity: 0.35;
+}
+
+.flow-screen-node .screen-module-tag {
+  font-size: 0.68rem;
+  font-weight: 700;
+  opacity: 0.75;
+  margin-bottom: 2px;
+}
+
+.screen-node-name {
+  font-weight: 600;
+}
+
+/* React Flow edge pulse when a new connection is made */
+.edge-pulse path {
+  stroke: var(--chrome-accent);
+  stroke-width: 3;
+  animation: edge-pulse 700ms ease-out;
+}
+
+@keyframes edge-pulse {
+  from {
+    stroke-width: 6;
+    opacity: 0.4;
+  }
+  to {
+    stroke-width: 2;
+    opacity: 1;
+  }
+}
+
+.detail-panel {
+  margin-top: 20px;
+  background: var(--chrome-surface);
+  padding-left: 24px;
+  padding-right: 24px;
+  padding-bottom: 20px;
+}
+
+.detail-panel .reached-from {
+  color: var(--chrome-text-muted);
+  font-size: 0.85rem;
+  margin: 6px 0 14px;
+}
+
+.action-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.action-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  transition: color 200ms ease;
+}
+
+.action-list .icon {
+  width: 18px;
+  text-align: center;
+  flex-shrink: 0;
+  transition: transform 200ms ease;
+}
+
+.action-list .done {
+  color: var(--chrome-text);
+  font-weight: 500;
+}
+
+.action-list .done .icon {
+  color: #4d8a63;
+}
+
+.action-list .planned {
+  color: var(--chrome-muted);
+}
+
+/* --- Development tab --- */
+.dev-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dev-row {
+  background: var(--chrome-surface);
+  border: 1px solid var(--chrome-border);
+  border-left: 4px solid var(--module-color, var(--chrome-accent));
+  border-radius: 10px;
+  padding: 14px 18px;
+  transition: outline-color 200ms ease;
+}
+
+.dev-row-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.dev-row-icon {
+  font-size: 1rem;
+}
+
+.dev-row-icon.done {
+  color: #4d8a63;
+}
+.dev-row-icon.in-progress {
+  color: var(--chrome-warm);
+}
+
+.dev-row-label {
+  flex: 1;
+  font-size: 0.92rem;
+  color: var(--chrome-text);
+}
+
+.dev-row-module-tag {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--chrome-text-muted);
+}
+
+.delta-source-tag {
+  font-weight: 500;
+  text-transform: none;
+  opacity: 0.8;
+}
+
+.dev-row-expand {
+  background: none;
+  border: none;
+  color: var(--chrome-text-muted);
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: color 150ms ease;
+}
+
+.dev-row-expand:hover {
+  color: var(--chrome-accent);
+}
+
+.dev-row-logs {
+  margin-top: 10px;
+  background: #23211d;
+  color: #bfe8cf;
+  font-family: "SF Mono", Consolas, monospace;
+  font-size: 0.8rem;
+  padding: 12px 14px;
+  border-radius: 8px;
+  white-space: pre-wrap;
+}
+
+.delta-qa {
+  background: var(--chrome-bg);
+  color: var(--chrome-text);
+  font-family: inherit;
+}
+
+.qa-line {
+  margin-bottom: 6px;
+}
+
+.dev-chat-input {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.dev-chat-input input {
+  flex: 1;
+  border: 1px solid var(--chrome-border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 0.9rem;
+}
+
+.dev-chat-input input:focus {
+  outline: 2px solid var(--chrome-accent);
+  outline-offset: 1px;
+}
+
+/* --- Modal / clarifying chat (Part 4) --- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(35, 33, 29, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  animation: fade-slide-in 150ms ease-out;
+}
+
+.modal-panel {
+  background: var(--chrome-surface);
+  border-radius: 14px;
+  padding: 22px 26px;
+  width: 420px;
+  max-width: 90vw;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.modal-title {
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--chrome-text-muted);
+}
+
+.field-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--chrome-text-muted);
+  margin-bottom: 12px;
+}
+
+.field-label input,
+.field-label select {
+  font-family: inherit;
+  font-size: 0.92rem;
+  font-weight: 400;
+  color: var(--chrome-text);
+  padding: 8px 10px;
+  border: 1px solid var(--chrome-border);
+  border-radius: 8px;
+}
+
+.chat-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.chat-bubble {
+  padding: 9px 13px;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  max-width: 85%;
+}
+
+.chat-bubble.user {
+  align-self: flex-end;
+  background: var(--chrome-accent);
+  color: #fff;
+  border-bottom-right-radius: 3px;
+}
+
+.chat-bubble.bot {
+  align-self: flex-start;
+  background: var(--chrome-bg);
+  color: var(--chrome-text);
+  border-bottom-left-radius: 3px;
+}
+
+.chat-bubble.typing {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  padding: 12px 14px;
+}
+
+.chat-bubble.typing .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--chrome-text-muted);
+  animation: typing-bounce 1s infinite ease-in-out;
+}
+
+.chat-bubble.typing .dot:nth-child(2) {
+  animation-delay: 150ms;
+}
+.chat-bubble.typing .dot:nth-child(3) {
+  animation-delay: 300ms;
+}
+
+@keyframes typing-bounce {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.5;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+.chat-input-row {
+  display: flex;
+  gap: 8px;
+}
+
+.chat-input-row input {
+  flex: 1;
+  border: 1px solid var(--chrome-border);
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 0.9rem;
+}
+
+.chat-input-row input:focus {
+  outline: 2px solid var(--chrome-accent);
+  outline-offset: 1px;
+}
+
+h2 {
+  margin-top: 0;
+}
