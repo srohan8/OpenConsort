@@ -169,9 +169,42 @@ def build_prompt(record: Dict[str, Any]) -> str:
     return f"{record['system_prompt']}\n\n{record['user_prompt']}\n\n### Response:\n"
 
 
+_task_counter = itertools.count()
+
+
+def create_isolated_db(base_url: str, db_name: str) -> str:
+    """Given a Postgres admin/base connection URL (e.g. the pgserver URI
+    postgresql://postgres:@127.0.0.1:PORT/postgres), create (or recreate) a
+    dedicated database `db_name` and return its own connection URL.
+
+    Same isolation pattern as postgres_verify_db_rows.py (one database per
+    task, not one shared database for the whole run) - a database-sqlalchemy
+    eval task's generated app does `Base.metadata.create_all(...)` and seeds
+    rows; running 31 tasks against one shared database risks table-name
+    collisions and leftover rows corrupting a later task's row-count
+    assertions. Isolating per task removes that risk entirely.
+    """
+    import psycopg2
+
+    admin_conn = psycopg2.connect(base_url)
+    admin_conn.autocommit = True
+    cur = admin_conn.cursor()
+    cur.execute(f"DROP DATABASE IF EXISTS {db_name}")
+    cur.execute(f"CREATE DATABASE {db_name}")
+    admin_conn.close()
+    return base_url.rsplit("/", 1)[0] + f"/{db_name}"
+
+
 def score_task(generate_fn: Callable[[str], str], record: Dict[str, Any]) -> Dict[str, Any]:
     """Run one eval task end-to-end: prompt -> generate -> parse -> check_spec.
-    A parse failure is an automatic fail for that task (per the brief)."""
+    A parse failure is an automatic fail for that task (per the brief).
+
+    If the EVAL_PG_BASE_URL env var is set (a live Postgres admin connection,
+    e.g. from pgserver - see the Colab setup cell), a fresh, isolated
+    database is created for THIS task and DATABASE_URL is pointed at it
+    before the generated app is imported/run, then restored afterward. Tasks
+    with no DB dependency are unaffected either way - they simply don't read
+    DATABASE_URL."""
     prompt = build_prompt(record)
     raw = generate_fn(prompt)
     try:
@@ -184,7 +217,22 @@ def score_task(generate_fn: Callable[[str], str], record: Dict[str, Any]) -> Dic
             "detail": f"parse failure: {e}",
             "raw_output": raw,
         }
-    passed, detail = run_eval_multifile(files, record)
+
+    base_pg_url = os.environ.get("EVAL_PG_BASE_URL")
+    prev_database_url = os.environ.get("DATABASE_URL")
+    if base_pg_url:
+        db_name = f"eval_task_{next(_task_counter)}"
+        os.environ["DATABASE_URL"] = create_isolated_db(base_pg_url, db_name)
+
+    try:
+        passed, detail = run_eval_multifile(files, record)
+    finally:
+        if base_pg_url:
+            if prev_database_url is None:
+                os.environ.pop("DATABASE_URL", None)
+            else:
+                os.environ["DATABASE_URL"] = prev_database_url
+
     return {
         "task": record["task"],
         "category": record["category"],
