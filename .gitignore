@@ -39,3 +39,5 @@ Thumbs.db
 # --- MetaGPT is its own git repo (separate clone/track), not part of this
 # --- repo's history. Add via `git submodule add` deliberately if ever wanted.
 MetaGPT/
+
+projects/

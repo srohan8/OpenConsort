@@ -1,13 +1,20 @@
-import { lockedSpec, moduleTitles, moduleColors, moduleActionCounts } from "../mockData";
 import ModuleHeading from "./ModuleHeading";
 
-export default function ProjectScopeTab({ selectedModule, onSelectModule }) {
+export default function ProjectScopeTab({ model, selectedModule, onSelectModule }) {
+  const { lockedSpec, moduleTitles, moduleColors, moduleActionCounts, openspec } = model;
   return (
     <div>
       <h2>Project Scope</h2>
       <p style={{ color: "var(--chrome-text-muted)", marginBottom: 24 }}>
         What you're building, grouped into modules.
       </p>
+      {openspec && (
+        <p className={`openspec-badge ${openspec.valid ? "ok" : "warn"}`} title={openspec.output}>
+          {openspec.valid === true && "OpenSpec: plan validated"}
+          {openspec.valid === false && "OpenSpec: plan has problems"}
+          {openspec.valid === null && "OpenSpec: not validated"}
+        </p>
+      )}
       <div className="module-cards">
         {lockedSpec.modules.map((mod) => {
           const titles = moduleTitles[mod.module_number];

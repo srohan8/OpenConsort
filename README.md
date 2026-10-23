@@ -67,6 +67,37 @@ To route a stage to a local model, run Ollama (`ollama serve`, with a model
 pulled, e.g. `ollama pull qwen2.5-coder:1.5b`) and adjust `build_stage_llms`
 in `orchestrator.py`.
 
+## Running the UI with planning
+
+```bash
+cd orchestrator && python server.py     # API on 127.0.0.1:8787 (POST /api/plan)
+cd frontend && npm run dev              # Vite proxies /api to it
+```
+
+"Start planning" on a new project runs only the Planning stage and shows the result. It needs
+the same LLM config as the orchestrator (`.env`). Projects are stored in the browser.
+
+## OpenSpec
+
+[OpenSpec](https://github.com/Fission-AI/openspec) is used in two ways:
+
+- **Developing this repo:** `openspec/` is initialized (`openspec init --tools claude`).
+  Use `/opsx:propose`, `/opsx:apply`, `/opsx:archive` in Claude Code for changes to OpenConsort
+  itself. Project context lives in `openspec/config.yaml`. The generated `.claude/` skills
+  are gitignored; re-create them with `openspec update`.
+- **In the pipeline:** `python orchestrator.py "<idea>" --openspec` renders the LockedSpec +
+  UserFlow into `generated/<run>/openspec/changes/initial-build/` (proposal, design, tasks,
+  `specs/features`, `specs/user-flow`) via `orchestrator/openspec_bridge.py`, and appends the
+  same requirements to the Backend/Frontend prompts. Rendering is deterministic (no LLM), and
+  the output passes `openspec validate initial-build --strict`.
+
+## Retrieval (few-shot)
+
+`--retrieve K` adds the K most similar *verified* FastAPI examples (BM25 over
+`data-prep/fastapi-backend-pairs-v3.jsonl`, no extra dependencies, never the held-out eval
+suite) to the Backend prompt. Only applies when `stack.backend` is FastAPI. See
+`orchestrator/retrieval.py`.
+
 ## Training data (`data-prep/`)
 
 A curated, **executed-and-verified** FastAPI backend dataset for fine-tuning a

@@ -8,11 +8,12 @@ from openai import APIStatusError, OpenAI
 
 
 class StageLLM:
-    def __init__(self, name: str, base_url: str, api_key: str, model: str, max_retries: int = 4, retry_wait: float = 5.0):
+    def __init__(self, name: str, base_url: str, api_key: str, model: str, max_retries: int = 4, retry_wait: float = 5.0, json_mode: bool = False):
         self.name = name
         self.model = model
         self.max_retries = max_retries
         self.retry_wait = retry_wait
+        self.json_mode = json_mode  # ask the server for a JSON object (Ollama/OpenAI response_format)
         self.client = OpenAI(base_url=base_url, api_key=api_key or "not-needed")
 
     def complete(self, system_prompt: str, user_prompt: str) -> str:
@@ -26,6 +27,7 @@ class StageLLM:
                         {"role": "user", "content": user_prompt},
                     ],
                     temperature=0.2,
+                    **({"response_format": {"type": "json_object"}} if self.json_mode else {}),
                 )
                 return resp.choices[0].message.content
             except APIStatusError as e:

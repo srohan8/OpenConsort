@@ -8,7 +8,6 @@ import {
   useEdgesState,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { userFlow, moduleColors, moduleTitles, lockedSpec } from "../mockData";
 import ModuleHeading from "./ModuleHeading";
 import ScreenNode from "./ScreenNode";
 import DeltaChatModal from "./DeltaChatModal";
@@ -18,7 +17,8 @@ const NODE_SPACING_X = 190;
 const NODE_SPACING_Y = 130;
 const NODE_TYPES = { screen: ScreenNode };
 
-function initialNodes(highlightModule) {
+function initialNodes(model, highlightModule) {
+  const { userFlow, moduleColors } = model;
   return userFlow.screens.map((screen, i) => ({
     id: screen.id,
     type: "screen",
@@ -35,7 +35,8 @@ function initialNodes(highlightModule) {
   }));
 }
 
-function initialEdges() {
+function initialEdges(model) {
+  const { userFlow } = model;
   return userFlow.transitions.map((t) => ({
     id: `${t.from}-${t.to}`,
     source: t.from,
@@ -45,7 +46,7 @@ function initialEdges() {
   }));
 }
 
-function DetailPanel({ screen }) {
+function DetailPanel({ screen, moduleTitles }) {
   if (!screen) {
     return (
       <div className="detail-panel">
@@ -73,7 +74,7 @@ function DetailPanel({ screen }) {
   );
 }
 
-function EditNodePanel({ node, onSave, onCancel }) {
+function EditNodePanel({ node, lockedSpec, onSave, onCancel }) {
   const [name, setName] = useState(node.data.name);
   const [moduleNumber, setModuleNumber] = useState(node.data.moduleNumber);
 
@@ -110,10 +111,11 @@ function EditNodePanel({ node, onSave, onCancel }) {
   );
 }
 
-export default function UserFlowTab({ selectedModule }) {
+export default function UserFlowTab({ model, selectedModule }) {
+  const { moduleColors, moduleTitles, lockedSpec } = model;
   const { addDelta } = useDeltas();
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes(selectedModule));
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges());
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes(model, selectedModule));
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges(model));
   const [selectedScreenId, setSelectedScreenId] = useState(null);
   const [editingNode, setEditingNode] = useState(null); // node currently open in EditNodePanel
   const [pendingEdit, setPendingEdit] = useState(null); // {editSummary, clarifyingQuestion, moduleNumber, commit(answer), revert()}
@@ -262,10 +264,10 @@ export default function UserFlowTab({ selectedModule }) {
           <Controls />
         </ReactFlow>
       </div>
-      <DetailPanel screen={selectedScreen} />
+      <DetailPanel screen={selectedScreen} moduleTitles={moduleTitles} />
 
       {editingNode && (
-        <EditNodePanel node={editingNode} onSave={handleSaveEdit} onCancel={() => setEditingNode(null)} />
+        <EditNodePanel node={editingNode} lockedSpec={lockedSpec} onSave={handleSaveEdit} onCancel={() => setEditingNode(null)} />
       )}
       {pendingEdit && (
         <DeltaChatModal

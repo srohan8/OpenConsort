@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { developmentStatus, moduleColors, lockedSpec } from "../mockData";
 import { useDeltas } from "../context/DeltaContext";
 
-function DevRow({ entry, isHighlighted }) {
+function DevRow({ entry, isHighlighted, model }) {
+  const { moduleColors, lockedSpec } = model;
   const [expanded, setExpanded] = useState(false);
   const moduleName = lockedSpec.modules.find((m) => m.module_number === entry.module_number)?.module_name;
 
@@ -36,7 +36,8 @@ function DevRow({ entry, isHighlighted }) {
 // Both sources produce the same delta shape (doc/kickoff-brief-ui-refinements.md
 // Part 4's open design question) - shown as one uniform thread type,
 // distinguished only by a small source tag.
-function DeltaThread({ delta, isHighlighted }) {
+function DeltaThread({ delta, isHighlighted, model }) {
+  const { moduleColors, lockedSpec } = model;
   const [expanded, setExpanded] = useState(false);
   const moduleName = lockedSpec.modules.find((m) => m.module_number === delta.module_number)?.module_name;
 
@@ -80,7 +81,7 @@ function DeltaThread({ delta, isHighlighted }) {
   );
 }
 
-function DevChatInput({ selectedModule }) {
+function DevChatInput({ selectedModule, lockedSpec }) {
   const { addDelta } = useDeltas();
   const [message, setMessage] = useState("");
 
@@ -113,7 +114,8 @@ function DevChatInput({ selectedModule }) {
   );
 }
 
-export default function DevelopmentTab({ selectedModule }) {
+export default function DevelopmentTab({ model, selectedModule }) {
+  const { developmentStatus, lockedSpec } = model;
   const { deltas } = useDeltas();
 
   return (
@@ -129,13 +131,14 @@ export default function DevelopmentTab({ selectedModule }) {
             key={entry.module_number}
             entry={entry}
             isHighlighted={selectedModule === entry.module_number}
+            model={model}
           />
         ))}
         {deltas.map((delta) => (
-          <DeltaThread key={delta.id} delta={delta} isHighlighted={selectedModule === delta.module_number} />
+          <DeltaThread key={delta.id} delta={delta} isHighlighted={selectedModule === delta.module_number} model={model} />
         ))}
       </div>
-      <DevChatInput selectedModule={selectedModule} />
+      <DevChatInput selectedModule={selectedModule} lockedSpec={lockedSpec} />
     </div>
   );
 }

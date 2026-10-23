@@ -32,6 +32,9 @@ def _load_dotenv():
 _load_dotenv()
 
 from llm_client import StageLLM, extract_files, extract_json
+from openspec_bridge import requirements_text, write_change
+from planning_format import PLANNING_SYSTEM, parse_plan
+from retrieval import Retriever, examples_text
 
 ROOT = Path(__file__).parent
 SCHEMAS = ROOT / "schemas"
@@ -105,15 +108,6 @@ def run_code_stage(run_id: str, stage: str, llm: StageLLM, system_prompt: str, u
     return parsed
 
 
-PLANNING_SYSTEM = """You are the Planning specialist in a fixed software-build pipeline.
-Given a one-line product idea, produce a LockedSpec and a UserFlow.
-Respond with a single JSON object with exactly two top-level keys: "locked_spec" and "user_flow".
-"locked_spec" must match this schema:
-{locked_spec_schema}
-"user_flow" must match this schema:
-{user_flow_schema}
-Both must use spec_version/version = 1. Output ONLY the JSON object, no other prose, no markdown fences."""
-
 DESIGN_SYSTEM = """You are the Design specialist in a fixed software-build pipeline.
 Given a LockedSpec and UserFlow, produce DesignTokens matching this schema:
 {design_tokens_schema}
@@ -172,6 +166,34 @@ for a small app) - implement the real flow, not a placeholder/stub, and apply th
 typography/spacing from DesignTokens where relevant."""
 
 
+def run_planning(run_id: str, llm: StageLLM, idea: str, max_repairs: int = 2) -> tuple:
+    """Planning stage: idea in, (locked_spec, user_flow, scenarios) out.
+
+    The model writes plain labelled lines (planning_format.py); code builds the schema-valid
+    LockedSpec/UserFlow. On a parse failure the error is fed back for up to `max_repairs` retries."""
+    user_prompt = f"Product idea: {idea}"
+    prompt = user_prompt
+    for attempt in range(max_repairs + 1):
+        print(f"[planning] calling {llm.model} @ {llm.client.base_url} (attempt {attempt + 1}) ...")
+        raw = llm.complete(PLANNING_SYSTEM, prompt)
+        try:
+            locked_spec, user_flow, scenarios = parse_plan(raw)
+        except ValueError as e:
+            log_stage(run_id, f"planning_try{attempt + 1}", PLANNING_SYSTEM, prompt, raw, {"__parse_error__": str(e)})
+            if attempt == max_repairs:
+                raise SystemExit(f"[planning] could not produce a valid plan after {attempt + 1} tries: {e}")
+            prompt = (
+                f"{user_prompt}\n\nYour previous answer was rejected: {e}\n"
+                "Try again using ONLY the labelled lines."
+            )
+            continue
+        log_stage(run_id, "planning", PLANNING_SYSTEM, prompt, raw, {"locked_spec": locked_spec, "user_flow": user_flow})
+        validate(locked_spec, "locked_spec.schema.json", "planning.locked_spec")
+        validate(user_flow, "user_flow.schema.json", "planning.user_flow")
+        print("[planning] OK - plan parsed and schema-valid.")
+        return locked_spec, user_flow, scenarios
+
+
 def build_stage_llms(use_ollama_for_backend: bool, use_ollama_for_frontend: bool) -> dict:
     cloud = dict(
         base_url=os.getenv("CLOUD_BASE_URL", "http://localhost:20128/v1"),
@@ -179,8 +201,14 @@ def build_stage_llms(use_ollama_for_backend: bool, use_ollama_for_frontend: bool
         model=os.getenv("CLOUD_MODEL", "My-combo"),
     )
     ollama = dict(base_url="http://localhost:11434/v1", api_key="ollama", model="qwen2.5-coder:1.5b")
+    # PLANNING_MODEL (e.g. "gemma3:1b") routes Planning to local Ollama instead of the cloud proxy.
+    planning_model = os.getenv("PLANNING_MODEL")
+    if planning_model:
+        planning = StageLLM("planning", **{**ollama, "model": planning_model})
+    else:
+        planning = StageLLM("planning", **cloud)
     stages = {
-        "planning": StageLLM("planning", **cloud),
+        "planning": planning,
         "design": StageLLM("design", **cloud),
     }
     stages["backend"] = StageLLM("backend", **(ollama if use_ollama_for_backend else cloud))
@@ -193,32 +221,29 @@ def main():
     parser.add_argument("idea", help="one-line product idea")
     parser.add_argument("--ollama-backend", action="store_true", help="route Backend stage to local Ollama")
     parser.add_argument("--ollama-frontend", action="store_true", help="route Frontend stage to local Ollama")
+    parser.add_argument(
+        "--openspec",
+        action="store_true",
+        help="write an OpenSpec change folder with the generated files and feed its requirements to Backend/Frontend",
+    )
+    parser.add_argument(
+        "--retrieve",
+        type=int,
+        default=0,
+        metavar="K",
+        help="add the K most similar verified FastAPI examples to the Backend prompt (0 = off)",
+    )
     args = parser.parse_args()
 
     suffix = "_ollama" if (args.ollama_backend or args.ollama_frontend) else "_cloud"
     run_id = datetime.datetime.now().strftime("%Y%m%d_%H%M%S") + suffix
     stages = build_stage_llms(args.ollama_backend, args.ollama_frontend)
 
-    locked_spec_schema = load_schema("locked_spec.schema.json")
-    user_flow_schema = load_schema("user_flow.schema.json")
     design_tokens_schema = load_schema("design_tokens.schema.json")
 
-    planning_out = run_stage(
-        run_id,
-        "planning",
-        stages["planning"],
-        PLANNING_SYSTEM.format(
-            locked_spec_schema=json.dumps(locked_spec_schema),
-            user_flow_schema=json.dumps(user_flow_schema),
-        ),
-        f"Product idea: {args.idea}",
-        None,
-    )
-    # planning_out is {"locked_spec": ..., "user_flow": ...} - validate each half separately
-    validate(planning_out["locked_spec"], "locked_spec.schema.json", "planning.locked_spec")
-    validate(planning_out["user_flow"], "user_flow.schema.json", "planning.user_flow")
-    locked_spec = planning_out["locked_spec"]
-    user_flow = planning_out["user_flow"]
+    locked_spec, user_flow, scenarios = run_planning(run_id, stages["planning"], args.idea)
+
+    spec_context = f"\n\n{requirements_text(locked_spec, user_flow, scenarios)}" if args.openspec else ""
 
     design_out = run_stage(
         run_id,
@@ -229,12 +254,18 @@ def main():
         "design_tokens.schema.json",
     )
 
+    retrieved = ""
+    if args.retrieve and "fastapi" in locked_spec["stack"]["backend"].lower():
+        rows = Retriever.from_pairs().search(" ".join(locked_spec["features"]), args.retrieve)
+        retrieved = f"\n\n{examples_text(rows)}" if rows else ""
+        print(f"[backend] retrieval: added {len(rows)} example(s)")
+
     backend_out = run_code_stage(
         run_id,
         "backend",
         stages["backend"],
         BACKEND_SYSTEM,
-        f"LockedSpec:\n{json.dumps(locked_spec)}\n\nDesignTokens:\n{json.dumps(design_out)}",
+        f"LockedSpec:\n{json.dumps(locked_spec)}\n\nDesignTokens:\n{json.dumps(design_out)}{spec_context}{retrieved}",
         spec_version=locked_spec["version"],
     )
 
@@ -245,7 +276,7 @@ def main():
         FRONTEND_SYSTEM,
         f"LockedSpec:\n{json.dumps(locked_spec)}\n\n"
         f"DesignTokens:\n{json.dumps(design_out)}\n\n"
-        f"UserFlow:\n{json.dumps(user_flow)}",
+        f"UserFlow:\n{json.dumps(user_flow)}{spec_context}",
         spec_version=locked_spec["version"],
     )
 
@@ -260,6 +291,9 @@ def main():
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(f["content"], encoding="utf-8")
     print(f"Files written to {out_dir}")
+    if args.openspec:
+        change = write_change(out_dir, args.idea, locked_spec, user_flow, scenarios=scenarios)
+        print(f"OpenSpec change written to {change}")
 
 
 if __name__ == "__main__":
