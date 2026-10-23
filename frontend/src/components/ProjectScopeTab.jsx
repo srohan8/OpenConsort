@@ -1,13 +1,26 @@
 import ModuleHeading from "./ModuleHeading";
 
-export default function ProjectScopeTab({ model, selectedModule, onSelectModule }) {
+export default function ProjectScopeTab({ model, selectedModule, onSelectModule, onRedo }) {
   const { lockedSpec, moduleTitles, moduleColors, moduleActionCounts, openspec } = model;
   return (
     <div>
-      <h2>Project Scope</h2>
-      <p style={{ color: "var(--chrome-text-muted)", marginBottom: 24 }}>
-        What you're building, grouped into modules.
-      </p>
+      <div className="page-header">
+        <div>
+          <h2>Project Scope</h2>
+          <p style={{ color: "var(--chrome-text-muted)", margin: 0 }}>What you're building, grouped into modules.</p>
+        </div>
+        {onRedo && (
+          <button
+            className="btn-secondary"
+            title="Run planning again from the original idea"
+            onClick={() => {
+              if (window.confirm("Redo planning? This replaces the current plan with a new one.")) onRedo();
+            }}
+          >
+            ↻ Redo planning
+          </button>
+        )}
+      </div>
       {openspec && (
         <p className={`openspec-badge ${openspec.valid ? "ok" : "warn"}`} title={openspec.output}>
           {openspec.valid === true && "OpenSpec: plan validated"}

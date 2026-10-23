@@ -98,6 +98,13 @@ the same LLM config as the orchestrator (`.env`). Projects are stored in the bro
 suite) to the Backend prompt. Only applies when `stack.backend` is FastAPI. See
 `orchestrator/retrieval.py`.
 
+**Planning** also uses retrieval: the 2 closest example plans from
+`data-prep/planning-examples.jsonl` go into the Planning prompt (`PLANNING_RETRIEVE=0` turns it off).
+Regenerate the library with `python data-prep/build_planning_examples.py`; every example is run
+through the real plan parser, so a malformed one can't be saved. The plan format groups features
+and screens under `MODULE:` lines; each module becomes one OpenSpec capability and one Project
+Scope card. "Redo planning" on the Project Scope page re-runs Planning from the saved idea.
+
 ## Training data (`data-prep/`)
 
 A curated, **executed-and-verified** FastAPI backend dataset for fine-tuning a

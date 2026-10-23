@@ -34,7 +34,8 @@ _load_dotenv()
 from llm_client import StageLLM, extract_files, extract_json
 from openspec_bridge import requirements_text, write_change
 from planning_format import PLANNING_SYSTEM, parse_plan
-from retrieval import Retriever, examples_text
+from planning_steps import plan_in_steps
+from retrieval import Retriever, examples_text, planning_examples_text
 
 ROOT = Path(__file__).parent
 SCHEMAS = ROOT / "schemas"
@@ -166,20 +167,30 @@ for a small app) - implement the real flow, not a placeholder/stub, and apply th
 typography/spacing from DesignTokens where relevant."""
 
 
-def run_planning(run_id: str, llm: StageLLM, idea: str, max_repairs: int = 2) -> tuple:
+def run_planning(
+    run_id: str, llm: StageLLM, idea: str, max_repairs: int = 2, retrieve: int | None = None, mode: str | None = None
+) -> tuple:
     """Planning stage: idea in, (locked_spec, user_flow, scenarios) out.
 
     The model writes plain labelled lines (planning_format.py); code builds the schema-valid
     LockedSpec/UserFlow. On a parse failure the error is fed back for up to `max_repairs` retries."""
-    user_prompt = f"Product idea: {idea}"
+    if retrieve is None:
+        retrieve = int(os.getenv("PLANNING_RETRIEVE", "2"))
+    mode = mode or os.getenv("PLANNING_MODE", "single")  # "single" or "two_step" (planning_steps.py)
+    examples = planning_examples_text(idea, retrieve)
+    intro = f"{examples}\n\nNow write the plan for this idea.\n" if examples else ""
+    user_prompt = f"{intro}Product idea: {idea}"
     prompt = user_prompt
     for attempt in range(max_repairs + 1):
         print(f"[planning] calling {llm.model} @ {llm.client.base_url} (attempt {attempt + 1}) ...")
-        raw = llm.complete(PLANNING_SYSTEM, prompt)
         try:
+            if mode == "two_step":
+                raw = plan_in_steps(llm.complete, idea, examples)
+            else:
+                raw = llm.complete(PLANNING_SYSTEM, prompt)
             locked_spec, user_flow, scenarios = parse_plan(raw)
         except ValueError as e:
-            log_stage(run_id, f"planning_try{attempt + 1}", PLANNING_SYSTEM, prompt, raw, {"__parse_error__": str(e)})
+            log_stage(run_id, f"planning_try{attempt + 1}", PLANNING_SYSTEM, prompt, locals().get("raw", ""), {"__parse_error__": str(e)})
             if attempt == max_repairs:
                 raise SystemExit(f"[planning] could not produce a valid plan after {attempt + 1} tries: {e}")
             prompt = (

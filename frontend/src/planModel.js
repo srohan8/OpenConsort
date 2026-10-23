@@ -2,8 +2,8 @@
 // module-grouped shape the Project Scope / User Flow / Development tabs render (the
 // same shape as mockData.js), so those layouts work unchanged for real projects.
 //
-// The real plan has no modules, so each feature becomes a module and each screen is
-// assigned to the feature whose text it overlaps most (first module if none match).
+// Modules come from locked_spec.modules. Plans saved before modules existed fall back to
+// one module per feature, with screens assigned by word overlap.
 import { lockedSpec, moduleTitles, moduleColors, userFlow, developmentStatus, moduleActionCounts } from "./mockData";
 
 export const demoModel = { lockedSpec, moduleTitles, moduleColors, userFlow, developmentStatus, moduleActionCounts };
@@ -26,11 +26,17 @@ function overlap(a, b) {
   return n;
 }
 
-export function buildPlanModel(plan) {
-  const { locked_spec: spec, user_flow: flow, scenarios = {}, openspec } = plan;
+function scenarioLine(sc) {
+  return `When ${sc.when || "..."}, ${sc.then || "..."}`;
+}
+
+// -> [{name, title, features: [name], screens: [id]}]
+function planModules(spec, flow, scenarios) {
+  if (spec.modules?.length) return spec.modules;
 
   const featureWords = spec.features.map((f) => words(`${f} ${scenarios[f]?.when || ""} ${scenarios[f]?.then || ""}`));
-  const moduleFor = (screen) => {
+  const modules = spec.features.map((f) => ({ name: f, title: f, features: [f], screens: [] }));
+  for (const screen of flow.screens) {
     const sw = words(`${screen.name} ${screen.purpose}`);
     let best = 0;
     let bestScore = 0;
@@ -41,22 +47,33 @@ export function buildPlanModel(plan) {
         bestScore = score;
       }
     });
-    return best + 1;
-  };
+    modules[best].screens.push(screen.id);
+  }
+  return modules;
+}
 
-  const modules = spec.features.map((f, i) => {
-    const sc = scenarios[f];
-    return {
-      module_number: i + 1,
-      module_name: f,
-      features: sc && (sc.when || sc.then) ? [`When ${sc.when || "..."}, ${sc.then || "..."}`] : [f],
-    };
-  });
+export function buildPlanModel(plan) {
+  const { locked_spec: spec, user_flow: flow, scenarios = {}, openspec } = plan;
+  const planned = planModules(spec, flow, scenarios);
+
+  const moduleOfScreen = {};
+  planned.forEach((m, i) =>
+    (m.screens || []).forEach((sid) => {
+      moduleOfScreen[sid] = i + 1;
+    })
+  );
+
+  const modules = planned.map((m, i) => ({
+    module_number: i + 1,
+    module_name: m.name,
+    features: m.features.map((f) => (scenarios[f] && (scenarios[f].when || scenarios[f].then) ? scenarioLine(scenarios[f]) : f)),
+  }));
   const titles = {};
   const colors = {};
-  modules.forEach((m) => {
-    titles[m.module_number] = { technicalLabel: `Module ${m.module_number} · ${m.module_name}`, plainTitle: m.module_name };
-    colors[m.module_number] = PALETTE[(m.module_number - 1) % PALETTE.length];
+  planned.forEach((m, i) => {
+    const n = i + 1;
+    titles[n] = { technicalLabel: `Module ${n} · ${m.name}`, plainTitle: m.title || m.name };
+    colors[n] = PALETTE[i % PALETTE.length];
   });
 
   const nameOf = Object.fromEntries(flow.screens.map((s) => [s.id, s.name]));
@@ -64,7 +81,7 @@ export function buildPlanModel(plan) {
     const incoming = flow.transitions.find((t) => t.to === s.id);
     return {
       id: s.id,
-      module_number: moduleFor(s),
+      module_number: moduleOfScreen[s.id] || 1,
       name: s.name,
       purpose: s.purpose,
       reached_from: incoming
@@ -79,8 +96,11 @@ export function buildPlanModel(plan) {
     };
   });
 
+  // Progress counts every feature and every screen action; nothing is built yet.
   const counts = {};
-  for (const m of modules) counts[m.module_number] = { done: 0, total: 0 };
+  planned.forEach((m, i) => {
+    counts[i + 1] = { done: 0, total: m.features.length };
+  });
   for (const s of screens) counts[s.module_number].total += s.actions.length;
 
   return {
@@ -88,8 +108,8 @@ export function buildPlanModel(plan) {
     moduleTitles: titles,
     moduleColors: colors,
     userFlow: { screens, transitions: flow.transitions },
-    developmentStatus: modules.map((m) => ({
-      module_number: m.module_number,
+    developmentStatus: planned.map((m, i) => ({
+      module_number: i + 1,
       status: "planned",
       label: "Planned - not built yet",
       logStub: "No build has run for this module yet.",

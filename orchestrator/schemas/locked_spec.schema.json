@@ -32,6 +32,20 @@
       "minItems": 1,
       "description": "Plain-language feature list, e.g. 'user signup/login', 'create/edit/delete tasks'."
     },
+    "modules": {
+      "type": "array",
+      "description": "Optional grouping of features and screens into modules (one per area of the app). `features` stays the flat list of every module's features.",
+      "items": {
+        "type": "object",
+        "required": ["name", "features"],
+        "properties": {
+          "name": { "type": "string" },
+          "title": { "type": "string", "description": "Plain-English title for non-technical readers." },
+          "features": { "type": "array", "items": { "type": "string" } },
+          "screens": { "type": "array", "items": { "type": "string" }, "description": "UserFlow screen ids." }
+        }
+      }
+    },
     "constraints": {
       "type": "array",
       "items": { "type": "string" },

@@ -1,10 +1,11 @@
 """Render a LockedSpec + UserFlow as an OpenSpec change folder (no LLM involved).
 
 Layout written under <out_dir>/openspec/changes/<change_name>/:
-    proposal.md, design.md, tasks.md, specs/<capability>/spec.md
+    proposal.md, design.md, tasks.md, specs/<module>/spec.md, specs/user-flow/spec.md
 
-The pipeline contracts stay JSON; this is a deterministic projection of them into
-OpenSpec's artifact format so a generated project can be developed with /opsx:* later.
+Each plan module becomes one OpenSpec capability. The pipeline contracts stay JSON; this is a
+deterministic projection of them into OpenSpec's artifact format so a generated project can be
+developed with /opsx:* later.
 """
 import re
 from pathlib import Path
@@ -14,13 +15,29 @@ def _slug(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-") or "item"
 
 
-def _screen_names(user_flow: dict) -> dict:
-    return {s["id"]: s["name"] for s in user_flow["screens"]}
+def _modules(locked_spec: dict) -> list:
+    """Plan modules, or one module holding every feature for plans without modules."""
+    modules = locked_spec.get("modules")
+    if modules:
+        return modules
+    return [{"name": "Features", "title": "Features", "features": locked_spec["features"], "screens": []}]
 
 
-def render_features_spec(locked_spec: dict, scenarios: dict | None = None) -> str:
+def _module_slugs(modules: list) -> list:
+    slugs, seen = [], set()
+    for m in modules:
+        slug = base = _slug(m["name"])
+        n = 2
+        while slug in seen or slug == "user-flow":
+            slug, n = f"{base}-{n}", n + 1
+        seen.add(slug)
+        slugs.append(slug)
+    return slugs
+
+
+def render_module_spec(module: dict, product_type: str, scenarios: dict | None = None) -> str:
     lines = ["## ADDED Requirements", ""]
-    for feature in locked_spec["features"]:
+    for feature in module["features"]:
         when = (scenarios or {}).get(feature, {}).get("when", "")
         then = (scenarios or {}).get(feature, {}).get("then", "")
         lines += [
@@ -28,7 +45,7 @@ def render_features_spec(locked_spec: dict, scenarios: dict | None = None) -> st
             f"The system SHALL provide: {feature}.",
             "",
             f"#### Scenario: {feature}",
-            f"- **WHEN** {when or 'a user exercises this feature in the ' + locked_spec['product_type']}",
+            f"- **WHEN** {when or 'a user exercises this feature in the ' + product_type}",
             f"- **THEN** {then or 'it behaves as described and the result is visible to the user'}",
             "",
         ]
@@ -36,7 +53,7 @@ def render_features_spec(locked_spec: dict, scenarios: dict | None = None) -> st
 
 
 def render_flow_spec(user_flow: dict) -> str:
-    names = _screen_names(user_flow)
+    names = {s["id"]: s["name"] for s in user_flow["screens"]}
     lines = ["## ADDED Requirements", ""]
     for screen in user_flow["screens"]:
         lines += [
@@ -49,7 +66,7 @@ def render_flow_spec(user_flow: dict) -> str:
             lines += [
                 f"#### Scenario: {screen['name']} is reachable",
                 f"- **WHEN** a user navigates to {screen['name']}",
-                f"- **THEN** the screen is shown",
+                "- **THEN** the screen is shown",
                 "",
             ]
         for t in outgoing:
@@ -69,6 +86,9 @@ def write_change(
     change = Path(out_dir) / "openspec" / "changes" / change_name
     stack = locked_spec["stack"]
     constraints = locked_spec.get("constraints") or []
+    modules = _modules(locked_spec)
+    slugs = _module_slugs(modules)
+    screen_name = {s["id"]: s["name"] for s in user_flow["screens"]}
 
     files = {
         "proposal.md": "\n".join(
@@ -81,7 +101,7 @@ def write_change(
                 "",
                 "## Capabilities",
                 "### New Capabilities",
-                "- `features`: product features from the LockedSpec",
+                *[f"- `{slug}`: {m.get('title') or m['name']}" for slug, m in zip(slugs, modules)],
                 "- `user-flow`: screens and transitions from the UserFlow",
                 "",
                 "## Impact",
@@ -102,15 +122,21 @@ def write_change(
                 "",
             ]
         ),
-        "specs/features/spec.md": render_features_spec(locked_spec, scenarios),
         "specs/user-flow/spec.md": render_flow_spec(user_flow),
     }
+    for slug, m in zip(slugs, modules):
+        if m["features"]:
+            files[f"specs/{slug}/spec.md"] = render_module_spec(m, locked_spec["product_type"], scenarios)
 
-    tasks = ["## 1. Backend", ""]
-    tasks += [f"- [ ] 1.{i} Implement: {f}" for i, f in enumerate(locked_spec["features"], 1)]
-    tasks += ["", "## 2. Frontend", ""]
-    tasks += [f"- [ ] 2.{i} Build screen: {s['name']}" for i, s in enumerate(user_flow["screens"], 1)]
-    files["tasks.md"] = "\n".join(tasks) + "\n"
+    tasks = []
+    for i, m in enumerate(modules, 1):
+        tasks += [f"## {i}. {m['name']}", ""]
+        items = [f"Implement: {f}" for f in m["features"]] + [
+            f"Build screen: {screen_name.get(sid, sid)}" for sid in m.get("screens", [])
+        ]
+        tasks += [f"- [ ] {i}.{j} {item}" for j, item in enumerate(items, 1)]
+        tasks.append("")
+    files["tasks.md"] = "\n".join(tasks)
 
     for rel, content in files.items():
         target = change / rel
@@ -122,4 +148,9 @@ def write_change(
 
 def requirements_text(locked_spec: dict, user_flow: dict, scenarios: dict | None = None) -> str:
     """The spec text appended to Backend/Frontend prompts when --openspec is set."""
-    return f"Requirements:\n{render_features_spec(locked_spec, scenarios)}\n{render_flow_spec(user_flow)}"
+    parts = [
+        f"Module: {m['name']}\n{render_module_spec(m, locked_spec['product_type'], scenarios)}"
+        for m in _modules(locked_spec)
+        if m["features"]
+    ]
+    return "Requirements:\n" + "\n".join(parts) + "\n" + render_flow_spec(user_flow)

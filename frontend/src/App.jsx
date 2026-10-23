@@ -59,7 +59,12 @@ function AppShell() {
           </div>
         )}
         {inProject && isPlanned && view === "scope" && (
-          <ProjectScopeTab model={model} selectedModule={selectedModule} onSelectModule={setSelectedModule} />
+          <ProjectScopeTab
+            model={model}
+            selectedModule={selectedModule}
+            onSelectModule={setSelectedModule}
+            onRedo={activeProject.plan ? () => planProject(activeProject.id, activeProject.idea) : undefined}
+          />
         )}
         {inProject && isPlanned && view === "userflow" && (
           <UserFlowTab key={activeProject.id} model={model} selectedModule={selectedModule} />
